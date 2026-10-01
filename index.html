@@ -427,7 +427,300 @@
       <div class="search-container">
         <div class="search-box">
           <input type="text" id="search-input" class="search-input" placeholder="พิมพ์รหัสวิชา, ชื่อวิชา หรือชื่ออาจารย์..." onkeyup="searchBooks()">
-          <button type="button" class="search-btn" onclick="searchBooks()">🔍 ค้นหา</button>
+         <button class="search-btn" onclick="searchBooks()">🔍 ค้นหา</button>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- 🧭 เมนูด้านล่าง (Bottom Navigation) -->
+  <nav class="bottom-nav">
+    <button class="nav-btn active" onclick="goToPage('home')">
+      <span class="nav-icon">🏠</span>
+      <span>หน้าหลัก</span>
+    </button>
+    <button class="nav-btn" onclick="goToPage('buy')">
+      <span class="nav-icon">📕</span>
+      <span>ซื้อหนังสือ</span>
+    </button>
+    <button class="nav-btn" onclick="goToPage('rent')">
+      <span class="nav-icon">📗</span>
+      <span>เช่าหนังสือ</span>
+    </button>
+    <button class="nav-btn" onclick="goToPage('exchange')">
+      <span class="nav-icon">🔄</span>
+      <span>แลกเปลี่ยน</span>
+    </button>
+    <button class="nav-btn" onclick="goToPage('sell')">
+      <span class="nav-icon">📤</span>
+      <span>ลงขาย</span>
+    </button>
+    <button class="nav-btn" onclick="goToPage('topup')">
+      <span class="nav-icon">🪙</span>
+      <span>เติมเงิน</span>
+    </button>
+  </nav>
+</div>
+
+<!-- ======================================
+     💬 Modal สำหรับระบบแชท / สอบถาม
+====================================== -->
+<div class="modal" id="chat-modal">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h3 id="chat-target-title">💬 สนทนากับผู้ขาย</h3>
+      <button class="modal-close" onclick="closeModal('chat-modal')">&times;</button>
+    </div>
+    <div class="chat-box" id="chat-box">
+      <div class="chat-message chat-other">สวัสดีครับ สอบถามรายละเอียดหนังสือเพิ่มเติมได้นะครับ</div>
+    </div>
+    <div class="chat-input">
+      <input type="text" id="chat-text-input" placeholder="พิมพ์ข้อความที่นี่..." />
+     <button class="btn btn-primary btn-sm" onclick="sendChatMessage()">ส่ง</button>
+    </div>
+  </div>
+</div>
+
+<!-- ======================================
+     📜 JavaScript การทำงานของแอปพลิเคชัน
+====================================== -->
+<script>
+  let userBalance = 200; // Coin เริ่มต้นฟรี
+  let cart = [];
+
+  // สลับหน้า Splash -> Auth
+  function goToAuth(mode) {
+    document.getElementById('splash').classList.add('hidden');
+    document.getElementById('auth-screen').classList.add('active');
+    switchAuthTab(mode);
+  }
+
+  function backToSplash() {
+    document.getElementById('splash').classList.remove('hidden');
+    document.getElementById('auth-screen').classList.remove('active');
+  }
+
+  function switchAuthTab(tab) {
+    const tabs = document.querySelectorAll('.auth-tab');
+    const forms = document.querySelectorAll('.auth-form');
+    tabs.forEach(t => t.classList.remove('active'));
+    forms.forEach(f => f.classList.remove('active'));
+
+    if (tab === 'login') {
+      tabs[0].classList.add('active');
+      document.getElementById('login-form').classList.add('active');
+    } else {
+      tabs[1].classList.add('active');
+      document.getElementById('register-form').classList.add('active');
+    }
+  }
+
+  // เข้าสู่ระบบ / สมัครสมาชิก
+  function handleLogin(e) {
+    e.preventDefault();
+    const email = document.getElementById('login-email').value;
+    const stdId = document.getElementById('login-stdid').value;
+
+   if (!email.includes('@')) {
+      showError('login-error', 'กรุณากรอกอีเมลมหาวิทยาลัยให้ถูกต้อง');
+      return;
+    }
+    loginSuccess(stdId);
+  }
+
+  function handleRegister(e) {
+    e.preventDefault();
+    const stdId = document.getElementById('reg-stdid').value;
+    loginSuccess(stdId);
+  }
+
+  function loginSuccess(stdId) {
+    document.getElementById('auth-screen').classList.remove('active');
+    document.getElementById('main-app').classList.add('active');
+    document.getElementById('display-stdid').innerText = 'รหัส: ' + stdId;
+    updateBalanceDisplay();
+  }
+
+  function showError(elementId, msg) {
+    const err = document.getElementById(elementId);
+    err.innerText = msg;
+    err.classList.remove('hidden');
+  }
+
+  // ระบบเปลี่ยนหน้าหลัก
+  function goToPage(pageName) {
+    const pages = document.querySelectorAll('.page');
+    const navBtns = document.querySelectorAll('.nav-btn');
+    
+    pages.forEach(p => p.classList.remove('active'));
+    navBtns.forEach(b => b.classList.remove('active'));
+
+    const targetPage = document.getElementById('page-' + pageName);
+    if (targetPage) targetPage.classList.add('active');
+
+    // Highlight ปุ่มเมนู
+    const btnIndex = ['home', 'buy', 'rent', 'exchange', 'sell', 'topup'].indexOf(pageName);
+    if (btnIndex !== -1 && navBtns[btnIndex]) {
+      navBtns[btnIndex].classList.add('active');
+    }
+    window.scrollTo(0, 0);
+  }
+
+  // ระบบตะกร้าสินค้า
+  function addToCart(code, title, price) {
+    cart.push({ code, title, price, type: 'ซื้อ' });
+    updateCart();
+    alert(`เพิ่ม ${title} ลงในตะกร้าเรียบร้อยแล้ว!`);
+  }
+
+  function addToCartRent(code, title, price, deposit) {
+    cart.push({ code, title, price: price + deposit, type: 'เช่า (รวมมัดจำ)' });
+    updateCart();
+    alert(`เพิ่ม ${title} (เช่า) ลงในตะกร้าเรียบร้อยแล้ว!`);
+  }
+
+  function updateCart() {
+    document.getElementById('cart-count').innerText = cart.length;
+    const list = document.getElementById('cart-list');
+    const emptyState = document.getElementById('cart-empty');
+    const fullState = document.getElementById('cart-full');
+
+    if (cart.length === 0) {
+      emptyState.style.display = 'block';
+      fullState.style.display = 'none';
+      list.innerHTML = '';
+      list.appendChild(emptyState);
+      return;
+    }
+
+    emptyState.style.display = 'none';
+    fullState.style.display = 'block';
+    
+    let html = '';
+    let total = 0;
+    cart.forEach((item, index) => {
+      total += item.price;
+      html += `
+        <div class="cart-item">
+          <div class="cart-info">
+            <strong>${item.title} (${item.code})</strong>
+            <div style="font-size:0.85rem; color:var(--text-light);">${item.type}</div>
+          </div>
+          <div><strong>${item.price} Coin</strong></div>
+          <button style="background:var(--danger); color:white; border:none; padding:5px 10px; border-radius:6px; cursor:pointer;" onclick="removeFromCart(${index})">🗑️</button>
+        </div>
+      `;
+    });
+
+    list.innerHTML = html;
+    document.getElementById('cart-total').innerText = total;
+  }
+
+  function removeFromCart(index) {
+    cart.splice(index, 1);
+    updateCart();
+  }
+
+  function selectDelivery(el) {
+    document.querySelectorAll('.delivery-option').forEach(o => o.classList.remove('selected'));
+    el.classList.add('selected');
+  }
+
+  function confirmOrder() {
+    let total = parseInt(document.getElementById('cart-total').innerText);
+    if (userBalance < total) {
+      alert('ยอด Coin ไม่พอ กรุณาเติม Coin ก่อนทำรายการครับ');
+      goToPage('topup');
+      return;
+    }
+    userBalance -= total;
+    updateBalanceDisplay();
+    cart = [];
+    updateCart();
+    alert('✅ สั่งซื้อสำเร็จ! เงินของคุณจะถูกถือไว้ในระบบอย่างปลอดภัยจนกว่าจะได้รับสินค้า');
+    goToPage('home');
+  }
+
+  // ระบบเติม Coin
+  function selectPackage(el, price, coin) {
+    userBalance += coin;
+    updateBalanceDisplay();
+
+    // แสดงใบเสร็จ
+    document.getElementById('receipt-area').style.display = 'block';
+    document.getElementById('trans-id').innerText = 'TX' + Math.floor(100000 + Math.random() * 900000);
+    document.getElementById('trans-pack').innerText = `${coin} Coin`;
+    document.getElementById('trans-price').innerText = `${price} บาท`;
+    document.getElementById('trans-date').innerText = new Date().toLocaleString('th-TH');
+
+    alert(`🎉 เติมเงินสำเร็จ! ได้รับ ${coin} Coin เรียบร้อยแล้ว`);
+  }
+
+  function updateBalanceDisplay() {
+    document.querySelectorAll('#head-balance').forEach(el => el.innerText = userBalance);
+  }
+
+  // ซื้อสินค้าดิจิทัล
+  function buyDigital(code, title, price) {
+    if (userBalance < price) {
+      alert('ยอด Coin ไม่พอครับ');
+      goToPage('topup');
+      return;
+    }
+    if (confirm(`ยืนยันการซื้อ ${title} ในราคา ${price} Coin?`)) {
+      userBalance -= price;
+      updateBalanceDisplay();
+      alert('✅ ชำระเงินสำเร็จ! กำลังดาวน์โหลดไฟล์สรุป...');
+    }
+  }
+
+  // ระบบค้นหา
+  function searchBooks() {
+    const query = document.getElementById('search-input').value.toLowerCase();
+    const resultsContainer = document.getElementById('search-results');
+    const cards = resultsContainer.getElementsByClassName('card');
+
+    Array.from(cards).forEach(card => {
+      const text = card.innerText.toLowerCase();
+      if (text.includes(query)) {
+        card.style.display = 'block';
+      } else {
+        card.style.display = 'none';
+      }
+    });
+  }
+
+  // แชท & Modal
+  function openChat(target) {
+    document.getElementById('chat-target-title').innerText = '💬 สนทนากับ' + target;
+    document.getElementById('chat-modal').classList.add('active');
+  }
+
+  function closeModal(id) {
+    document.getElementById(id).classList.remove('active');
+  }
+
+  function sendChatMessage() {
+    const input = document.getElementById('chat-text-input');
+    if (!input.value.trim()) return;
+
+    const chatBox = document.getElementById('chat-box');
+    const msg = document.createElement('div');
+    msg.className = 'chat-message chat-me';
+    msg.innerText = input.value;
+    chatBox.appendChild(msg);
+    
+    input.value = '';
+    chatBox.scrollTop = chatBox.scrollHeight;
+  }
+
+  function openExchange() {
+    goToPage('exchange');
+  }
+</script>
+</body>
+</html>
+<button type="button" class="search-btn" onclick="searchBooks()">🔍 ค้นหา</button>
         </div>
       </div>
 
